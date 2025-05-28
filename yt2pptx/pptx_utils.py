@@ -12,6 +12,7 @@ def create_pptx_from_images_with_timestamps(
     image_tuples: list[tuple[Path, int]], output_pptx: Path, video_id: str
 ) -> None:
     """Create a PowerPoint presentation from a list of images with timestamps.
+
     This function takes a list of tuples containing image paths and their corresponding
     timestamps in seconds, and creates a PowerPoint presentation where each slide contains
     an image and a hyperlink to the YouTube video at the specified timestamp.
@@ -49,5 +50,6 @@ def create_pptx_from_images_with_timestamps(
         font.underline = True
         font.color.rgb = RGBColor(0, 102, 204)
         run.hyperlink.address = youtube_link
+
     prs.save(str(output_pptx))
     print(f"✅ PowerPoint saved: {output_pptx}")

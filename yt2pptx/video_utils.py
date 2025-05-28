@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 def sanitize_filename(name: str) -> str:
     """Sanitize a filename by replacing invalid characters with underscores.
+
     This function replaces characters that are not allowed in filenames
     on most file systems, such as Windows and Unix-like systems.
 
@@ -24,6 +25,7 @@ def sanitize_filename(name: str) -> str:
 
 def make_timestamp(timestamp: int, is_filename=False) -> str:
     """Convert a timestamp in seconds to a formatted string.
+
     The format is "h:mm:ss" or "m:ss" if the hour is zero.
     If `is_filename` is True, it uses '-' instead of ':' for compatibility with filenames.
 
@@ -52,6 +54,7 @@ def make_timestamp(timestamp: int, is_filename=False) -> str:
 
 def sort_timestamp(k: Path) -> str:
     """Extract and format the timestamp from a filename for sorting purposes.
+
     This function assumes the filename contains a timestamp in the format
     "h-mm-ss" or "m-ss", where 'h' is hours, 'm' is minutes, and 's' is seconds.
     If the timestamp is not present, it returns the original filename.
@@ -67,11 +70,13 @@ def sort_timestamp(k: Path) -> str:
     if not timestamp:
         return k.name
     h, x = timestamp.split("-", 1)
+
     return f"{int(h):04d}-{x}"
 
 
 def extract_video_id(input_url_or_id: str) -> str:
     """Extract the YouTube video ID from a URL or ID string.
+
     This function checks if the input is already a valid video ID (11 characters long).
     If it is not, it uses regular expressions to search for the video ID in the input string.
     If no valid ID is found, it returns an empty string.
@@ -91,6 +96,7 @@ def extract_video_id(input_url_or_id: str) -> str:
         m = re.search(pat, input_url_or_id)
         if m:
             return m.group(1)
+
     return ""
 
 
@@ -98,6 +104,7 @@ def extract_frames_ffmpeg(
     video_path: Path, frame_dir: Path, interval_seconds=3
 ) -> list[Path]:
     """Extract frames from a video file using ffmpeg.
+
     This function uses ffmpeg to extract frames from a video file at specified intervals.
     It saves the frames in a specified directory with a naming pattern that includes the timestamp
     in the format "frame_h-mm-ss.jpg".
@@ -147,6 +154,7 @@ def filter_unique_images(
     image_paths: list[Path], hash_diff_threshold: int | None = None, fps_interval=3
 ) -> list[tuple[Path, int]]:
     """Filter unique images based on perceptual hashing.
+
     This function computes the average perceptual hash for each image in the provided list.
     It then compares the hashes of consecutive images to determine if they are unique
     based on a specified threshold. If the difference between hashes is greater than the

@@ -17,6 +17,7 @@ def download_youtube_video(
     input_url_or_id: str, out_dir: Path
 ) -> tuple[Path, str, str]:
     """Download a YouTube video and return the path, title, and video ID.
+
     If the video is already downloaded, it will return the existing path and title.
 
     Args:
@@ -36,6 +37,7 @@ def download_youtube_video(
         title = title_file.read_text("utf-8").strip()
         print(f"✅ Video already downloaded: {final_path} with title '{title}'")
         return final_path, title, video_id
+
     video_info = {}
 
     def get_info_hook(d: dict) -> None:
@@ -52,6 +54,7 @@ def download_youtube_video(
         "quiet": True,
     }
     print("🔽 Downloading video...")
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(input_url_or_id, download=True)
         if info is not None:
@@ -62,6 +65,7 @@ def download_youtube_video(
             video_info["id"] = ""
     title = sanitize_filename(video_info["title"])
     title_file.write_text(title, encoding="utf-8")
+
     return final_path, title, video_id
 
 
