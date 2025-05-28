@@ -9,6 +9,7 @@ from pptx.dml.color import RGBColor
 import yt_dlp
 from tqdm import tqdm
 import re
+import statistics
 
 
 def sanitize_filename(name):
@@ -57,8 +58,9 @@ def download_youtube_video(input_url_or_id: str, out_dir: Path):
     final_path = out_dir / f"{video_id}.mp4"
 
     if final_path.exists() and title_file.exists():
-        print(f"✅ Video already downloaded: {final_path}")
-        return final_path, title_file.read_text("utf-8"), video_id
+        title = title_file.read_text("utf-8").strip()
+        print(f"✅ Video already downloaded: {final_path} with title '{title}'")
+        return final_path, title, video_id
 
     video_info = {}
 
@@ -121,11 +123,33 @@ def extract_frames_ffmpeg(video_path: Path, frame_dir: Path, interval_seconds=3)
     return renamed_frames
 
 
-def filter_unique_images(image_paths, hash_diff_threshold=3, fps_interval=3):
+def imagehash_to_int(hash_obj: imagehash.ImageHash) -> int:
+    bit_string = "".join("1" if b else "0" for b in hash_obj.hash.flatten())
+    return int(bit_string, 2)
+
+
+def filter_unique_images(
+    image_paths, hash_diff_threshold: int | None = None, fps_interval=3
+):
     hashes = []
     for idx, path in enumerate(tqdm(image_paths, desc="Hashing images")):
         with Image.open(path) as img:
-            hashes.append((path, imagehash.average_hash(img), idx))
+            hash_obj = imagehash.average_hash(img)
+            hashes.append((path, hash_obj, idx))
+
+    # Dynamically determine threshold if not provided
+    if hash_diff_threshold is None and len(hashes) > 1:
+        diffs = [abs(hashes[i][1] - hashes[i - 1][1]) for i in range(1, len(hashes))]
+        mean = statistics.mean(diffs)
+        stdev = statistics.stdev(diffs) if len(diffs) > 1 else 0
+        # Optimal threshold: mean /2, but at least 1
+        hash_diff_threshold = max(1, int(mean / 2))
+        print(
+            f"ℹ️ Auto-calculated hash_diff_threshold: {hash_diff_threshold} using mean/2 with mean={mean:.2f} and stdev={stdev:.2f}"
+        )
+    elif hash_diff_threshold is None:
+        hash_diff_threshold = 5  # fallback for single image
+        print(f"ℹ️ Using default hash_diff_threshold: {hash_diff_threshold}")
 
     unique_images = []
     last_hash = None
@@ -133,19 +157,14 @@ def filter_unique_images(image_paths, hash_diff_threshold=3, fps_interval=3):
     duplicate_end = None
 
     for i, (path, curr_hash, idx) in enumerate(hashes):
-        if last_hash is None or curr_hash - last_hash > hash_diff_threshold:
+        if last_hash is None or abs(curr_hash - last_hash) > hash_diff_threshold:
             # Print duplicate range if any
             if duplicate_start is not None and duplicate_end is not None:
-                start_sec = duplicate_start * fps_interval
+                start_sec = (duplicate_start - 1) * fps_interval
                 end_sec = duplicate_end * fps_interval
                 start_ts = f"{start_sec // 60:02.0f}:{start_sec % 60:02.0f}"
                 end_ts = f"{end_sec // 60:02.0f}:{end_sec % 60:02.0f}"
-
-                frame_range = (
-                    f"{start_ts}-{end_ts}" if start_sec != end_sec else start_ts
-                )
-
-                print(f"🗑️ Removed duplicate frames {frame_range}")
+                print(f"🗑️ Removed duplicate frames from {start_ts} to {end_ts}")
                 duplicate_start = None
                 duplicate_end = None
 
@@ -168,9 +187,7 @@ def filter_unique_images(image_paths, hash_diff_threshold=3, fps_interval=3):
     return unique_images
 
 
-def create_pptx_from_images_with_timestamps(
-    image_tuples, output_pptx, video_id, fps_interval
-):
+def create_pptx_from_images_with_timestamps(image_tuples, output_pptx, video_id):
     prs = Presentation()
     blank_slide_layout = prs.slide_layouts[6]
 
@@ -269,6 +286,4 @@ if __name__ == "__main__":
     unique_images = filter_unique_images(extracted_images, fps_interval=fps_interval)
 
     print("🧾 Creating PowerPoint...")
-    create_pptx_from_images_with_timestamps(
-        unique_images, pptx_output, video_id, fps_interval
-    )
+    create_pptx_from_images_with_timestamps(unique_images, pptx_output, video_id)
