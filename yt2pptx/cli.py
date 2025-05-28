@@ -16,6 +16,17 @@ from .pptx_utils import create_pptx_from_images_with_timestamps
 def download_youtube_video(
     input_url_or_id: str, out_dir: Path
 ) -> tuple[Path, str, str]:
+    """Download a YouTube video and return the path, title, and video ID.
+    If the video is already downloaded, it will return the existing path and title.
+
+    Args:
+        input_url_or_id (str): YouTube video URL or ID.
+        out_dir (Path): Output directory where the video will be saved.
+
+    Returns:
+        tuple[Path, str, str]: A tuple containing the path to the downloaded video,
+        the title of the video, and the video ID.
+    """
     video_id = extract_video_id(input_url_or_id)
     video_folder = out_dir / video_id
     video_folder.mkdir(exist_ok=True)
@@ -27,7 +38,8 @@ def download_youtube_video(
         return final_path, title, video_id
     video_info = {}
 
-    def get_info_hook(d):
+    def get_info_hook(d: dict) -> None:
+        """Hook to get video information during download."""
         if d.get("status") == "finished":
             video_info["title"] = d["info_dict"].get("title", "video")
             video_info["id"] = d["info_dict"].get("id", "")
@@ -54,6 +66,20 @@ def download_youtube_video(
 
 
 def parse_args(argv: list[str]) -> tuple[str, str | None, int]:
+    """Parse command line arguments.
+
+    Args:
+        argv (list[str]): List of command line arguments.
+    If the first argument is a YouTube URL or ID, it will be used as the input.
+    If the second argument is provided, it will be used as the custom base name for the output file.
+    Optionally, an interval can be specified with -i=SECONDS or --interval=SECONDS.
+    If no interval is specified, it defaults to 3 seconds.
+    If no input URL or ID is provided, it will print usage instructions and exit.
+
+    Returns:
+        tuple[str, str | None, int]: A tuple containing the input URL or ID,
+        the custom base name (or None if not provided), and the FPS interval in seconds.
+    """
     input_url_or_id = None
     custom_base = None
     fps_interval = 3
@@ -73,6 +99,7 @@ def parse_args(argv: list[str]) -> tuple[str, str | None, int]:
 
 
 def main() -> None:
+    """Main function to run the command line interface for yt2pptx."""
     input_url_or_id, custom_base, fps_interval = parse_args(sys.argv)
     if not input_url_or_id:
         print(
