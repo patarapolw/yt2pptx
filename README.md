@@ -13,30 +13,23 @@ A Python script to convert a YouTube video (or any video supported by [yt-dlp](h
 
 ## Requirements
 
-- Python 3.7+
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-- [ffmpeg](https://ffmpeg.org/) (must be in your PATH)
-- [Pillow](https://python-pillow.org/)
-- [imagehash](https://github.com/JohannesBuchner/imagehash)
-- [python-pptx](https://python-pptx.readthedocs.io/)
-- [tqdm](https://tqdm.github.io/)
-
 Install dependencies with:
 
 ```sh
 pip install yt-dlp pillow imagehash python-pptx tqdm
 ```
 
-Make sure `ffmpeg` is installed and available in your system PATH.
+Make sure [ffmpeg](https://ffmpeg.org/) is installed and available in your system PATH.
 
 ## Usage
 
 ```sh
-python yt2pptx.py <YouTube_URL_or_ID> [output_base_name]
+python yt2pptx.py <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--interval=SECONDS]
 ```
 
 - `<YouTube_URL_or_ID>`: Any input accepted by yt-dlp (YouTube URL, video ID, playlist, etc.)
 - `[output_base_name]`: (Optional) Custom base name for output files
+- `-i=SECONDS` or `--interval=SECONDS`: (Optional, can be anywhere in the arguments) Set seconds between frames (default: 3)
 
 ### Example
 
@@ -46,12 +39,12 @@ python yt2pptx.py https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 This will create in the `out/` directory:
 - `out/video_title.pptx` — the generated PowerPoint
-- `out/video_title_frames/` — folder with extracted unique frames
+- `out/video_id_frames/` — folder with extracted unique frames (where `video_id` is the YouTube video ID)
 
-You can also specify a custom base name:
+You can also specify a custom base name and/or change the interval:
 
 ```sh
-python yt2pptx.py dQw4w9WgXcQ MySlides
+python yt2pptx.py dQw4w9WgXcQ MySlides --interval=10
 ```
 
 ## How it Works
