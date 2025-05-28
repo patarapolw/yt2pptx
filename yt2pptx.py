@@ -104,24 +104,48 @@ def extract_frames_ffmpeg(video_path, output_folder, interval_seconds=3):
 
 
 def filter_unique_images(image_paths, hash_diff_threshold=5, fps_interval=3):
-    # Compute hashes for all images
     hashes = []
     for idx, path in enumerate(tqdm(image_paths, desc="Hashing images")):
         with Image.open(path) as img:
             hashes.append((path, imagehash.average_hash(img), idx))
 
-    # Keep only images that are sufficiently different from the last kept image
     unique_images = []
     last_hash = None
-    for path, curr_hash, idx in hashes:
+    duplicate_start = None
+    duplicate_end = None
+
+    for i, (path, curr_hash, idx) in enumerate(hashes):
         if last_hash is None or curr_hash - last_hash > hash_diff_threshold:
+            # Print duplicate range if any
+            if duplicate_start is not None and duplicate_end is not None:
+                start_sec = duplicate_start * fps_interval
+                end_sec = duplicate_end * fps_interval
+                start_ts = f"{start_sec // 60:02.0f}:{start_sec % 60:02.0f}"
+                end_ts = f"{end_sec // 60:02.0f}:{end_sec % 60:02.0f}"
+
+                frame_range = (
+                    f"{start_ts}-{end_ts}" if start_sec != end_sec else start_ts
+                )
+
+                print(f"🗑️ Removed duplicate frames {frame_range}")
+                duplicate_start = None
+                duplicate_end = None
+
             seconds = idx * fps_interval
             unique_images.append((path, seconds))
             last_hash = curr_hash
         else:
-            seconds = idx * fps_interval
-            timestamp = f"{seconds // 60:02.0f}:{seconds % 60:02.0f}"
-            print(f"🗑️ Removed duplicate frame at {timestamp} ({Path(path).name})")
+            if duplicate_start is None:
+                duplicate_start = idx
+            duplicate_end = idx
+
+    # Print any remaining duplicate range at the end
+    if duplicate_start is not None and duplicate_end is not None:
+        start_sec = duplicate_start * fps_interval
+        end_sec = duplicate_end * fps_interval
+        start_ts = f"{start_sec // 60:02.0f}:{start_sec % 60:02.0f}"
+        end_ts = f"{end_sec // 60:02.0f}:{end_sec % 60:02.0f}"
+        print(f"🗑️ Removed duplicate frames from {start_ts} to {end_ts}")
 
     return unique_images
 
