@@ -5,7 +5,6 @@ A Python script to convert a YouTube video (or any video supported by [yt-dlp](h
 ## Features
 
 - Accepts any input supported by yt-dlp (YouTube URL, video ID, playlist, etc.)
-- Downloads the best available video and audio
 - Extracts frames every N seconds (default: 3 seconds)
 - Removes near-duplicate frames using perceptual hashing
 - Generates a PowerPoint presentation with each unique frame as a slide
@@ -34,17 +33,17 @@ python -m yt2pptx.cli <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--inter
 ### Example
 
 ```sh
-python yt2pptx.py https://www.youtube.com/watch?v=dQw4w9WgXcQ
+python -m yt2pptx.cli https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
 This will create in the `out/` directory:
 - `out/video_title.pptx` — the generated PowerPoint
-- `out/video_id_frames/` — folder with extracted unique frames (where `video_id` is the YouTube video ID)
+- `out/{video_id}/` — folder with extracted frames and video title (where `{video_id}` is the YouTube video ID)
 
 You can also specify a custom base name and/or change the interval:
 
 ```sh
-python yt2pptx.py dQw4w9WgXcQ MySlides --interval=10
+python -m yt2pptx.cli dQw4w9WgXcQ MySlides --interval=10
 ```
 
 ## How it Works
