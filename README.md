@@ -24,7 +24,7 @@ Make sure [ffmpeg](https://ffmpeg.org/) is installed and available in your syste
 ## Usage
 
 ```sh
-python yt2pptx.py <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--interval=SECONDS]
+python -m yt2pptx.cli <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--interval=SECONDS]
 ```
 
 - `<YouTube_URL_or_ID>`: Any input accepted by yt-dlp (YouTube URL, video ID, playlist, etc.)

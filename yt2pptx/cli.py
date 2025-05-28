@@ -1,0 +1,113 @@
+import sys
+from pathlib import Path
+
+import yt_dlp
+
+from .video_utils import (
+    sanitize_filename,
+    extract_video_id,
+    extract_frames_ffmpeg,
+    filter_unique_images,
+    sort_timestamp,
+)
+from .pptx_utils import create_pptx_from_images_with_timestamps
+
+
+def download_youtube_video(
+    input_url_or_id: str, out_dir: Path
+) -> tuple[Path, str, str]:
+    video_id = extract_video_id(input_url_or_id)
+    video_folder = out_dir / video_id
+    video_folder.mkdir(exist_ok=True)
+    title_file = video_folder / ".title.txt"
+    final_path = out_dir / f"{video_id}.mp4"
+    if final_path.exists() and title_file.exists():
+        title = title_file.read_text("utf-8").strip()
+        print(f"✅ Video already downloaded: {final_path} with title '{title}'")
+        return final_path, title, video_id
+    video_info = {}
+
+    def get_info_hook(d):
+        if d.get("status") == "finished":
+            video_info["title"] = d["info_dict"].get("title", "video")
+            video_info["id"] = d["info_dict"].get("id", "")
+
+    ydl_opts = {
+        "outtmpl": final_path,
+        "format": "bestvideo+bestaudio/best",
+        "merge_output_format": "mp4",
+        "progress_hooks": [get_info_hook],
+        "quiet": True,
+    }
+    print("🔽 Downloading video...")
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([input_url_or_id])
+        info = ydl.extract_info(input_url_or_id, download=True)
+        if info is not None:
+            video_info["title"] = info.get("title", "video")
+            video_info["id"] = info.get("id", "")
+        else:
+            video_info["title"] = "video"
+            video_info["id"] = ""
+    title = sanitize_filename(video_info["title"])
+    title_file.write_text(title, encoding="utf-8")
+    return final_path, title, video_id
+
+
+def parse_args(argv: list[str]) -> tuple[str, str | None, int]:
+    input_url_or_id = None
+    custom_base = None
+    fps_interval = 3
+    for arg in argv[1:]:
+        if arg.startswith("-i=") or arg.startswith("--interval="):
+            try:
+                fps_interval = int(arg.split("=", 1)[1])
+            except Exception:
+                print("❌ Invalid interval value. Use -i=SECONDS or --interval=SECONDS")
+                sys.exit(1)
+        elif input_url_or_id is None:
+            input_url_or_id = arg
+        elif custom_base is None:
+            custom_base = sanitize_filename(arg)
+
+    return input_url_or_id or "", custom_base, fps_interval
+
+
+def main() -> None:
+    input_url_or_id, custom_base, fps_interval = parse_args(sys.argv)
+    if not input_url_or_id:
+        print(
+            "❌ Usage: python -m yt2pptx.cli <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--interval=SECONDS]"
+        )
+        sys.exit(1)
+    out_dir = Path() / "out"
+    out_dir.mkdir(exist_ok=True)
+    video_file, video_title, video_id = download_youtube_video(input_url_or_id, out_dir)
+    base_name = custom_base or video_title
+    frames_folder = out_dir / video_id
+    has_interval = False
+    for p in frames_folder.glob("*_0-00-*.jpg"):
+        if p.name.endswith(f"{fps_interval:02d}.jpg"):
+            has_interval = True
+            break
+    pptx_output = out_dir / f"{base_name}.pptx"
+    if not has_interval:
+        print("🎞 Extracting frames...")
+        extracted_images = extract_frames_ffmpeg(
+            video_file, frames_folder, interval_seconds=fps_interval
+        )
+    else:
+        print(
+            f"🎞 Using previously extracted frames in '{frames_folder}' (interval={fps_interval}s)"
+        )
+        extracted_images = sorted(
+            Path(frames_folder).glob("frame_*.jpg"), key=sort_timestamp
+        )
+    print("🧹 Filtering duplicate frames...")
+    unique_images = filter_unique_images(extracted_images, fps_interval=fps_interval)
+    print("🧾 Creating PowerPoint...")
+    create_pptx_from_images_with_timestamps(unique_images, pptx_output, video_id)
+
+
+if __name__ == "__main__":
+    main()
