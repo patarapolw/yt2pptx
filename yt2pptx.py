@@ -16,13 +16,13 @@ def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name)
 
 
-def download_youtube_video(video_id, output_path=None):
-    url = f"https://www.youtube.com/watch?v={video_id}"
+def download_youtube_video(input_url_or_id, output_path=None):
     video_info = {}
 
     def get_info_hook(d):
         if d.get("status") == "finished":
-            video_info["title"] = d["info_dict"].get("title", video_id)
+            video_info["title"] = d["info_dict"].get("title", "video")
+            video_info["id"] = d["info_dict"].get("id", "")
 
     temp_path = "temp_video.mp4" if output_path is None else output_path
 
@@ -35,8 +35,9 @@ def download_youtube_video(video_id, output_path=None):
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        video_info["title"] = info.get("title", video_id)
+        info = ydl.extract_info(input_url_or_id, download=True)
+        video_info["title"] = info.get("title", "video")
+        video_info["id"] = info.get("id", "")
 
     title = sanitize_filename(video_info["title"])
     final_path = output_path or f"{title}.mp4"
@@ -44,7 +45,7 @@ def download_youtube_video(video_id, output_path=None):
     if temp_path != final_path:
         os.rename(temp_path, final_path)
 
-    return final_path, title
+    return final_path, title, video_info["id"]
 
 
 def extract_frames_ffmpeg(video_path, output_folder, interval_seconds=3):
@@ -124,16 +125,19 @@ if __name__ == "__main__":
         print("❌ Usage: python yt2pptx.py <YouTube_URL_or_ID> [output_base_name]")
         sys.exit(1)
 
-    video_id = sys.argv[1]
+    input_url_or_id = sys.argv[1]
     custom_base = sanitize_filename(sys.argv[2]) if len(sys.argv) > 2 else None
     fps_interval = 3  # seconds between extracted frames
 
+    out_dir = "out"
+    os.makedirs(out_dir, exist_ok=True)
+
     print("🔽 Downloading video...")
-    video_file, video_title = download_youtube_video(video_id)
+    video_file, video_title, video_id = download_youtube_video(input_url_or_id)
     base_name = custom_base or video_title
 
-    pptx_output = f"{base_name}.pptx"
-    frames_folder = f"{base_name}_frames"
+    pptx_output = os.path.join(out_dir, f"{base_name}.pptx")
+    frames_folder = os.path.join(out_dir, f"{base_name}_frames")
 
     print("🎞 Extracting frames...")
     extracted_images = extract_frames_ffmpeg(
