@@ -12,12 +12,20 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "_", name)
 
 
-def make_timestamp(idx: int, interval_seconds: int) -> str:
-    timestamp = idx * interval_seconds
-    hours = timestamp // 3600
-    minutes = (timestamp % 3600) // 60
-    seconds = timestamp % 60
-    return f"{hours:d}-{minutes:02d}-{seconds:02d}"
+def make_timestamp(timestamp: int, is_filename=False) -> str:
+    hour = timestamp // 3600
+    format_dict = {
+        "h": hour,
+        "m": (timestamp % 3600) // 60,
+        "s": timestamp % 60,
+        "x": "-" if is_filename else ":",
+    }
+
+    format_string = "{h:d}{x}{m:02d}{x}{s:02d}"
+    if not is_filename and hour == 0:
+        format_string = "{m:02d}{x}{s:02d}"
+
+    return format_string.format(**format_dict)
 
 
 def sort_timestamp(k: Path) -> str:
@@ -59,7 +67,7 @@ def extract_frames_ffmpeg(
     frames = sorted(frame_dir.glob("frame_[0-9][0-9][0-9][0-9].jpg"))
     renamed_frames = []
     for idx, frame_path in enumerate(frames):
-        timestamp = make_timestamp(idx, interval_seconds)
+        timestamp = make_timestamp(idx * interval_seconds, True)
         new_name = f"frame_{timestamp}.jpg"
         new_path = frame_path.with_name(new_name)
         if new_path.exists():
@@ -94,16 +102,20 @@ def filter_unique_images(
     duplicate_start = None
     duplicate_end = None
 
+    def remove_duplicates():
+        nonlocal duplicate_start, duplicate_end
+        if duplicate_start is not None and duplicate_end is not None:
+            start_sec = (duplicate_start - 1) * fps_interval
+            end_sec = duplicate_end * fps_interval
+            start_ts = make_timestamp(start_sec)
+            end_ts = make_timestamp(end_sec)
+            print(f"🗑️ Removed duplicate frames from {start_ts} to {end_ts}")
+            duplicate_start = None
+            duplicate_end = None
+
     for i, (path, curr_hash, idx) in enumerate(hashes):
         if last_hash is None or abs(curr_hash - last_hash) > hash_diff_threshold:
-            if duplicate_start is not None and duplicate_end is not None:
-                start_sec = (duplicate_start - 1) * fps_interval
-                end_sec = duplicate_end * fps_interval
-                start_ts = f"{start_sec // 60:02.0f}:{start_sec % 60:02.0f}"
-                end_ts = f"{end_sec // 60:02.0f}:{end_sec % 60:02.0f}"
-                print(f"🗑️ Removed duplicate frames from {start_ts} to {end_ts}")
-                duplicate_start = None
-                duplicate_end = None
+            remove_duplicates()
             seconds = idx * fps_interval
             unique_images.append((path, seconds))
             last_hash = curr_hash
@@ -111,10 +123,5 @@ def filter_unique_images(
             if duplicate_start is None:
                 duplicate_start = idx
             duplicate_end = idx
-    if duplicate_start is not None and duplicate_end is not None:
-        start_sec = duplicate_start * fps_interval
-        end_sec = duplicate_end * fps_interval
-        start_ts = f"{start_sec // 60:02.0f}:{start_sec % 60:02.0f}"
-        end_ts = f"{end_sec // 60:02.0f}:{end_sec % 60:02.0f}"
-        print(f"🗑️ Removed duplicate frames from {start_ts} to {end_ts}")
+    remove_duplicates()
     return unique_images

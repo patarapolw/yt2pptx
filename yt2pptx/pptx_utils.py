@@ -5,6 +5,8 @@ from pptx.util import Inches, Length, Pt
 from pptx.dml.color import RGBColor
 from tqdm import tqdm
 
+from .video_utils import make_timestamp
+
 
 def create_pptx_from_images_with_timestamps(
     image_tuples: list[tuple[Path, int]], output_pptx: Path, video_id: str
@@ -16,7 +18,7 @@ def create_pptx_from_images_with_timestamps(
         slide.shapes.add_picture(
             str(img_path), Inches(0), Inches(0), width=prs.slide_width
         )
-        timestamp = f"{seconds // 60:02.0f}:{seconds % 60:02.0f}"
+        timestamp = make_timestamp(seconds)
         youtube_link = f"https://www.youtube.com/watch?v={video_id}&t={seconds}s"
         left = Inches(0.3)
         top = (

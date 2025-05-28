@@ -33,7 +33,7 @@ def download_youtube_video(
             video_info["id"] = d["info_dict"].get("id", "")
 
     ydl_opts = {
-        "outtmpl": final_path,
+        "outtmpl": str(final_path),
         "format": "bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "progress_hooks": [get_info_hook],
@@ -41,7 +41,6 @@ def download_youtube_video(
     }
     print("🔽 Downloading video...")
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([input_url_or_id])
         info = ydl.extract_info(input_url_or_id, download=True)
         if info is not None:
             video_info["title"] = info.get("title", "video")
