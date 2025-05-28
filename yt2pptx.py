@@ -10,11 +10,26 @@ from pptx.dml.color import RGBColor
 import yt_dlp
 from tqdm import tqdm
 import re
-import numpy as np
 
 
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name)
+
+
+def make_timestamp(idx, interval_seconds):
+    timestamp = idx * interval_seconds
+    hours = timestamp // 3600
+    minutes = (timestamp % 3600) // 60
+    seconds = timestamp % 60
+    return f"{hours:d}-{minutes:02d}-{seconds:02d}"
+
+
+def sort_timestamp(k: Path):
+    timestamp = k.name.split("_").pop()
+    if not timestamp:
+        return k
+    h, x = timestamp.split("-", 1)
+    return f"{int(h):04d}-{x}"
 
 
 def download_youtube_video(input_url_or_id, output_path=None):
@@ -63,7 +78,7 @@ def download_youtube_video(input_url_or_id, output_path=None):
 
 def extract_frames_ffmpeg(video_path, output_folder, interval_seconds=3):
     os.makedirs(output_folder, exist_ok=True)
-    output_pattern = os.path.join(output_folder, "frame_%04d.jpg")
+    temp_pattern = os.path.join(output_folder, "frame_%04d.jpg")
     ffmpeg_cmd = [
         "ffmpeg",
         "-i",
@@ -72,48 +87,58 @@ def extract_frames_ffmpeg(video_path, output_folder, interval_seconds=3):
         f"fps=1/{interval_seconds}",
         "-q:v",
         "2",
-        output_pattern,
+        temp_pattern,
     ]
     subprocess.run(ffmpeg_cmd, check=True)
-    return sorted(Path(output_folder).glob("frame_*.jpg"))
+
+    # Rename frames to include timestamp
+    frames = sorted(Path(output_folder).glob("frame_*.jpg"))
+    renamed_frames = []
+    for idx, frame_path in enumerate(frames):
+        timestamp = make_timestamp(idx, interval_seconds)
+        new_name = f"frame_{timestamp}.jpg"
+        new_path = frame_path.with_name(new_name)
+        frame_path.rename(new_path)
+        renamed_frames.append(new_path)
+    return renamed_frames
 
 
-def filter_unique_images(image_paths, hash_diff_threshold=5):
-    import imagehash
-    from collections import OrderedDict
-
+def filter_unique_images(image_paths, hash_diff_threshold=5, fps_interval=3):
     # Compute hashes for all images
     hashes = []
-    for path in tqdm(image_paths, desc="Hashing images"):
+    for idx, path in enumerate(tqdm(image_paths, desc="Hashing images")):
         with Image.open(path) as img:
-            hashes.append((path, imagehash.average_hash(img)))
+            hashes.append((path, imagehash.average_hash(img), idx))
 
     # Keep only images that are sufficiently different from the last kept image
     unique_images = []
     last_hash = None
-    for path, curr_hash in hashes:
+    for path, curr_hash, idx in hashes:
         if last_hash is None or curr_hash - last_hash > hash_diff_threshold:
-            unique_images.append(path)
+            seconds = idx * fps_interval
+            unique_images.append((path, seconds))
             last_hash = curr_hash
         else:
-            os.remove(path)
+            seconds = idx * fps_interval
+            timestamp = f"{seconds // 60:02.0f}:{seconds % 60:02.0f}"
+            print(f"🗑️ Removed duplicate frame at {timestamp} ({Path(path).name})")
+
     return unique_images
 
 
 def create_pptx_from_images_with_timestamps(
-    image_paths, output_pptx, video_id, fps_interval
+    image_tuples, output_pptx, video_id, fps_interval
 ):
     prs = Presentation()
     blank_slide_layout = prs.slide_layouts[6]
 
-    for idx, img_path in enumerate(tqdm(image_paths, desc="Creating slides")):
+    for img_path, seconds in tqdm(image_tuples, desc="Creating slides"):
         slide = prs.slides.add_slide(blank_slide_layout)
         slide.shapes.add_picture(
             str(img_path), Inches(0), Inches(0), width=prs.slide_width
         )
 
         # Timestamp and hyperlink
-        seconds = idx * fps_interval
         timestamp = f"{seconds // 60:02.0f}:{seconds % 60:02.0f}"
         youtube_link = f"https://www.youtube.com/watch?v={video_id}&t={seconds}s"
 
@@ -196,7 +221,7 @@ if __name__ == "__main__":
         extracted_images = sorted(Path(frames_folder).glob("frame_*.jpg"))
 
     print("🧹 Filtering duplicate frames...")
-    unique_images = filter_unique_images(extracted_images)
+    unique_images = filter_unique_images(extracted_images, fps_interval=fps_interval)
 
     print("🧾 Creating PowerPoint...")
     create_pptx_from_images_with_timestamps(
