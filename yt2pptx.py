@@ -1,4 +1,3 @@
-import os
 import sys
 import subprocess
 from pathlib import Path
@@ -32,7 +31,35 @@ def sort_timestamp(k: Path):
     return f"{int(h):04d}-{x}"
 
 
-def download_youtube_video(input_url_or_id, output_path=None):
+def extract_video_id(input_url_or_id: str) -> str:
+    # If input is already an 11-char YouTube ID, return it
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", input_url_or_id):
+        return input_url_or_id
+
+    # Try to extract video ID from common YouTube URL formats
+    patterns = [
+        r"(?:v=|\/)([A-Za-z0-9_-]{11})(?:[&?\/]|$)",  # v=ID or /ID
+    ]
+    for pat in patterns:
+        m = re.search(pat, input_url_or_id)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def download_youtube_video(input_url_or_id: str, out_dir: Path):
+    video_id = extract_video_id(input_url_or_id)
+
+    video_folder = out_dir / video_id
+    video_folder.mkdir(exist_ok=True)
+    title_file = video_folder / ".title.txt"
+
+    final_path = out_dir / f"{video_id}.mp4"
+
+    if final_path.exists() and title_file.exists():
+        print(f"✅ Video already downloaded: {final_path}")
+        return final_path, title_file.read_text("utf-8"), video_id
+
     video_info = {}
 
     def get_info_hook(d):
@@ -40,9 +67,18 @@ def download_youtube_video(input_url_or_id, output_path=None):
             video_info["title"] = d["info_dict"].get("title", "video")
             video_info["id"] = d["info_dict"].get("id", "")
 
-    # Get video info first to determine video_id
-    with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
-        info = ydl.extract_info(input_url_or_id, download=False)
+    ydl_opts = {
+        "outtmpl": final_path,
+        "format": "bestvideo+bestaudio/best",
+        "merge_output_format": "mp4",
+        "progress_hooks": [get_info_hook],
+        "quiet": True,
+    }
+
+    print("🔽 Downloading video...")
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([input_url_or_id])
+        info = ydl.extract_info(input_url_or_id, download=True)
         if info is not None:
             video_info["title"] = info.get("title", "video")
             video_info["id"] = info.get("id", "")
@@ -50,35 +86,14 @@ def download_youtube_video(input_url_or_id, output_path=None):
             video_info["title"] = "video"
             video_info["id"] = ""
 
-    video_id = video_info["id"]
     title = sanitize_filename(video_info["title"])
-    out_dir = "out"
-    os.makedirs(out_dir, exist_ok=True)
-    final_path = os.path.join(out_dir, f"{video_id}.mp4")
-
-    if os.path.exists(final_path):
-        print(f"✅ Video already downloaded: {final_path}")
-        return final_path, title, video_id
-
-    temp_path = final_path  # Download directly to final_path
-
-    ydl_opts = {
-        "outtmpl": temp_path,
-        "format": "bestvideo+bestaudio/best",
-        "merge_output_format": "mp4",
-        "progress_hooks": [get_info_hook],
-        "quiet": True,
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([input_url_or_id])
+    title_file.write_text(title, encoding="utf-8")
 
     return final_path, title, video_id
 
 
-def extract_frames_ffmpeg(video_path, output_folder, interval_seconds=3):
-    os.makedirs(output_folder, exist_ok=True)
-    temp_pattern = os.path.join(output_folder, "frame_%04d.jpg")
+def extract_frames_ffmpeg(video_path: Path, frame_dir: Path, interval_seconds=3):
+    temp_pattern = frame_dir / "frame_%04d.jpg"
     ffmpeg_cmd = [
         "ffmpeg",
         "-i",
@@ -87,23 +102,26 @@ def extract_frames_ffmpeg(video_path, output_folder, interval_seconds=3):
         f"fps=1/{interval_seconds}",
         "-q:v",
         "2",
-        temp_pattern,
+        str(temp_pattern),
     ]
     subprocess.run(ffmpeg_cmd, check=True)
 
     # Rename frames to include timestamp
-    frames = sorted(Path(output_folder).glob("frame_*.jpg"))
+    frames = sorted(frame_dir.glob("frame_[0-9][0-9][0-9][0-9].jpg"))
     renamed_frames = []
     for idx, frame_path in enumerate(frames):
         timestamp = make_timestamp(idx, interval_seconds)
         new_name = f"frame_{timestamp}.jpg"
         new_path = frame_path.with_name(new_name)
+        if new_path.exists():
+            new_path.unlink()  # Overwrite if exists
+
         frame_path.rename(new_path)
         renamed_frames.append(new_path)
     return renamed_frames
 
 
-def filter_unique_images(image_paths, hash_diff_threshold=5, fps_interval=3):
+def filter_unique_images(image_paths, hash_diff_threshold=3, fps_interval=3):
     hashes = []
     for idx, path in enumerate(tqdm(image_paths, desc="Hashing images")):
         with Image.open(path) as img:
@@ -217,32 +235,35 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    out_dir = "out"
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir = Path() / "out"
+    out_dir.mkdir(exist_ok=True)
 
-    print("🔽 Downloading video...")
-    video_file, video_title, video_id = download_youtube_video(input_url_or_id)
+    video_file, video_title, video_id = download_youtube_video(input_url_or_id, out_dir)
     base_name = custom_base or video_title
 
-    frames_folder = os.path.join(out_dir, f"{video_id}_frames")
-    interval_marker = os.path.join(frames_folder, f".interval_{fps_interval}s")
+    frames_folder = out_dir / video_id
 
-    pptx_output = os.path.join(out_dir, f"{base_name}.pptx")
+    has_interval = False
+    for p in frames_folder.glob("*_0-00-*.jpg"):
+        if p.name.endswith(f"{fps_interval:02d}.jpg"):
+            has_interval = True
+            break
+
+    pptx_output = out_dir / f"{base_name}.pptx"
 
     # Only extract frames if not already done with this interval
-    if not (os.path.isdir(frames_folder) and os.path.isfile(interval_marker)):
+    if not has_interval:
         print("🎞 Extracting frames...")
         extracted_images = extract_frames_ffmpeg(
             video_file, frames_folder, interval_seconds=fps_interval
         )
-        # Mark extraction interval
-        with open(interval_marker, "w") as f:
-            f.write(str(fps_interval))
     else:
         print(
             f"🎞 Using previously extracted frames in '{frames_folder}' (interval={fps_interval}s)"
         )
-        extracted_images = sorted(Path(frames_folder).glob("frame_*.jpg"))
+        extracted_images = sorted(
+            Path(frames_folder).glob("frame_*.jpg"), key=sort_timestamp
+        )
 
     print("🧹 Filtering duplicate frames...")
     unique_images = filter_unique_images(extracted_images, fps_interval=fps_interval)
