@@ -1,0 +1,9 @@
+{
+    "[python]": {
+        "editor.formatOnSave": true,
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.defaultColorDecorators": "never",
+        "editor.formatOnType": true,
+        "editor.wordBasedSuggestions": "off",
+    }
+}
