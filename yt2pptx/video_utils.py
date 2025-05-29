@@ -126,6 +126,8 @@ def extract_frames_ffmpeg(
     temp_pattern = frame_dir / "frame_%04d.jpg"
     ffmpeg_cmd = [
         "ffmpeg",
+        "-loglevel",
+        "error",
         "-i",
         video_path,
         "-vf",
