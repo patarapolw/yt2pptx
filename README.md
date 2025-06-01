@@ -30,7 +30,7 @@ python -m yt2pptx.cli <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--inter
 
 - `<YouTube_URL_or_ID>`: Any input accepted by yt-dlp (YouTube URL, video ID, playlist, etc.)
 - `[output_base_name]`: (Optional) Custom base name for output files
-- `-i=SECONDS` or `--interval=SECONDS`: (Optional, can be anywhere in the arguments) Set seconds between frames (default: 3)
+- `-i=SECONDS` or `--interval=SECONDS`: (Optional, can be anywhere in the arguments) Set seconds between frames (default: 1)
 
 ### Example
 
