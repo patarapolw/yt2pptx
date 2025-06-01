@@ -101,7 +101,7 @@ def extract_video_id(input_url_or_id: str) -> str:
 
 
 def extract_frames_ffmpeg(
-    video_path: Path, frame_dir: Path, interval_seconds=3
+    video_path: Path, frame_dir: Path, interval_seconds: int
 ) -> list[Path]:
     """Extract frames from a video file using ffmpeg.
 
