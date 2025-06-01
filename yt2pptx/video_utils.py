@@ -23,7 +23,7 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "_", name)
 
 
-def make_timestamp(timestamp: int, is_filename=False) -> str:
+def make_timestamp(timestamp: int, *, is_filename=False) -> str:
     """Convert a timestamp in seconds to a formatted string.
 
     The format is "h:mm:ss" or "m:ss" if the hour is zero.
@@ -50,6 +50,33 @@ def make_timestamp(timestamp: int, is_filename=False) -> str:
         format_string = "{m:d}{x}{s:02d}"
 
     return format_string.format(**format_dict)
+
+
+def timestamp_to_seconds(timestamp: str, separator: str = ":") -> int:
+    """Convert a timestamp string to seconds.
+
+    The timestamp can be in the format "h:mm:ss", "m:ss", or "ss".
+    If the format is invalid, it raises a ValueError.
+
+    Args:
+        timestamp (str): The timestamp string to convert.
+        separator (str, optional): The separator used in the timestamp. Defaults to ":".
+
+    Returns:
+        int: The total number of seconds represented by the timestamp.
+
+    Raises:
+        ValueError: If the timestamp format is invalid.
+    """
+    parts = timestamp.split(separator)
+    if len(parts) == 3:  # h:mm:ss
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    elif len(parts) == 2:  # m:ss
+        return int(parts[0]) * 60 + int(parts[1])
+    elif len(parts) == 1:  # ss
+        return int(parts[0])
+    else:
+        raise ValueError(f"Invalid timestamp format: {timestamp}")
 
 
 def sort_timestamp(k: Path) -> str:
@@ -115,8 +142,7 @@ def extract_frames_ffmpeg(
     Args:
         video_path (Path): Path to the video file from which frames will be extracted.
         frame_dir (Path): Directory where the extracted frames will be saved.
-        interval_seconds (int, optional): Interval in seconds at which frames will be extracted.
-        Defaults to 3 seconds.
+        interval_seconds (int): Interval in seconds at which frames will be extracted.
 
     Returns:
         list[Path]: A list of Path objects representing the extracted frames.
@@ -138,23 +164,15 @@ def extract_frames_ffmpeg(
     ]
     subprocess.run(ffmpeg_cmd, check=True)
 
-    frames = sorted(frame_dir.glob("frame_[0-9][0-9][0-9][0-9].jpg"))
-    renamed_frames = []
-    for idx, frame_path in enumerate(frames):
-        timestamp = make_timestamp(idx * interval_seconds, True)
-        new_name = f"frame_{timestamp}.jpg"
-        new_path = frame_path.with_name(new_name)
-        if new_path.exists():
-            new_path.unlink()
-        frame_path.rename(new_path)
-        renamed_frames.append(new_path)
-
-    return renamed_frames
+    return sorted(frame_dir.glob("frame_[0-9][0-9][0-9][0-9].jpg"))
 
 
 def filter_unique_images(
-    image_paths: list[Path], hash_diff_threshold: int | None = None, fps_interval=3
-) -> list[tuple[Path, int]]:
+    image_paths: list[Path],
+    fps_interval: int,
+    *,  # This allows for future extensibility without breaking the function signature
+    hash_diff_threshold: int | None = None,
+) -> tuple[list[Path], int]:
     """Filter unique images based on perceptual hashing.
 
     This function computes the average perceptual hash for each image in the provided list.
@@ -164,20 +182,20 @@ def filter_unique_images(
 
     Args:
         image_paths (list[Path]): List of image file paths to be processed.
+        fps_interval (int): Interval in seconds for the frame rate, used to calculate timestamps.
+
         hash_diff_threshold (int | None, optional): Threshold for hash difference to consider images unique.
         If None, it will be auto-calculated based on the mean and standard deviation of hash differences.
         Defaults to None.
-        fps_interval (int, optional): Interval in seconds for the frame rate, used to calculate timestamps.
-        Defaults to 3 seconds.
 
     Returns:
-        list[tuple[Path, int]]: A list of tuples where each tuple contains the path to a unique image
-        and the corresponding timestamp in seconds.
+        list[Path]: A list of path to a unique images after filtering duplicates.
+        int: The hash difference threshold calculated or provided.
     Raises:
         ValueError: If no images are provided in the image_paths list.
         statistics.StatisticsError: If there is not enough data to calculate mean or standard deviation.
     """
-    hashes = []
+    hashes: list[tuple[Path, imagehash.ImageHash, int]] = []
     for idx, path in enumerate(tqdm(image_paths, desc="Hashing images")):
         with Image.open(path) as img:
             hash_obj = imagehash.average_hash(img)
@@ -194,32 +212,58 @@ def filter_unique_images(
         hash_diff_threshold = 5
         print(f"ℹ️ Using default hash_diff_threshold: {hash_diff_threshold}")
 
-    unique_images = []
-    last_hash = None
-    duplicate_start = None
-    duplicate_end = None
+    unique_images: list[Path] = []
+    last_hash: imagehash.ImageHash | None = None
+    duplicate_start: int | None = None
+    duplicate_end: int | None = None
 
-    def remove_duplicates():
+    duplicate_interval_list: list[tuple[str, str]] = []
+
+    def calculated_removed_duplicates():
         nonlocal duplicate_start, duplicate_end
         if duplicate_start is not None and duplicate_end is not None:
             start_sec = (duplicate_start - 1) * fps_interval
             end_sec = duplicate_end * fps_interval
             start_ts = make_timestamp(start_sec)
             end_ts = make_timestamp(end_sec)
-            print(f"🗑️ Removed duplicate frames from {start_ts} to {end_ts}")
+            duplicate_interval_list.append((start_ts, end_ts))
+
             duplicate_start = None
             duplicate_end = None
 
-    for path, curr_hash, idx in hashes:
+    for frame_path, curr_hash, idx in hashes:
         if last_hash is None or abs(curr_hash - last_hash) > hash_diff_threshold:
-            remove_duplicates()
-            seconds = idx * fps_interval
-            unique_images.append((path, seconds))
+            calculated_removed_duplicates()
+
+            timestamp = make_timestamp(idx * fps_interval, is_filename=True)
+            new_name = f"{timestamp}.jpg"
+            new_path = frame_path.with_name(new_name)
+            if new_path.exists():
+                new_path.unlink()
+            frame_path.rename(new_path)
+            unique_images.append(new_path)
             last_hash = curr_hash
         else:
+            frame_path.unlink()
             if duplicate_start is None:
                 duplicate_start = idx
             duplicate_end = idx
-    remove_duplicates()
+    calculated_removed_duplicates()
 
-    return unique_images
+    if duplicate_interval_list:
+        print("🗑️ Removed duplicate frames:")
+        chuck_size = 10
+        n_chunks = len(duplicate_interval_list) % chuck_size
+        for i in range(n_chunks):
+            print(
+                "  "
+                + " / ".join(
+                    f"{start}-{end}"
+                    for start, end in duplicate_interval_list[
+                        i * chuck_size : (i + 1) * chuck_size
+                    ]
+                )
+                + (" / " if i < n_chunks - 1 else "")
+            )
+
+    return unique_images, hash_diff_threshold
