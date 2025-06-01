@@ -162,45 +162,13 @@ def main() -> None:
 
     out_dir = Path() / "out"
     out_dir.mkdir(exist_ok=True)
-    video_file, video_title, video_id = download_youtube_video(input_url_or_id, out_dir)
+    video_file, video_title, _ = download_youtube_video(input_url_or_id, out_dir)
+
     base_name = custom_base or video_title
-    frames_folder = out_dir / video_id
-    has_interval = False
-    for p in frames_folder.glob("*_0-00-*.jpg"):
-        if p.name.endswith(f"{fps_interval:02d}.jpg"):
-            has_interval = True
-            break
     pptx_output = out_dir / f"{base_name}.pptx"
 
     # TODO: extract frames on the fly without saving them to disk
-    # youtube_to_pptx_cache_frames(out_dir, video_file, pptx_output, fps_interval)
-    if not has_interval:
-        print("🎞 Extracting frames...")
-        extracted_images = extract_frames_ffmpeg(
-            video_file, frames_folder, interval_seconds=fps_interval
-        )
-    else:
-        print(
-            f"🎞 Using previously extracted frames in '{frames_folder}' (interval={fps_interval}s)"
-        )
-
-        re_name = re.compile(r"frame_(\d+)-(\d{2})-(\d{2}).jpg")
-
-        def interval_filter(p: Path) -> bool:
-            m = re_name.match(p.name)
-            if m:
-                sec = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
-                return sec % fps_interval == 0
-            return False
-
-        extracted_images = sorted(
-            filter(interval_filter, Path(frames_folder).glob("frame_*.jpg")),
-            key=sort_timestamp,
-        )
-    print("🧹 Filtering duplicate frames...")
-    unique_images = filter_unique_images(extracted_images, fps_interval=fps_interval)
-    print("🧾 Creating PowerPoint...")
-    create_pptx_from_images_with_timestamps(unique_images, pptx_output, video_id)
+    youtube_to_pptx_cache_frames(out_dir, video_file, pptx_output, fps_interval)
 
 
 if __name__ == "__main__":
