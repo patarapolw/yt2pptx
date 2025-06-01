@@ -5,11 +5,11 @@ from pptx.util import Inches, Length, Pt
 from pptx.dml.color import RGBColor
 from tqdm import tqdm
 
-from .video_utils import make_timestamp
+from .video_utils import timestamp_to_seconds
 
 
 def create_pptx_from_images_with_timestamps(
-    image_tuples: list[tuple[Path, int]], output_pptx: Path, video_id: str
+    image_paths: list[Path], output_pptx: Path, video_id: str
 ) -> None:
     """Create a PowerPoint presentation from a list of images with timestamps.
 
@@ -18,20 +18,23 @@ def create_pptx_from_images_with_timestamps(
     an image and a hyperlink to the YouTube video at the specified timestamp.
 
     Args:
-        image_tuples (list[tuple[Path, int]]): A list of tuples where each tuple contains:
-            image_path (Path): The path to the image file.
-            seconds (int): The timestamp in seconds for the image.
+        image_paths (list[Path]): A list of paths to the image file.
         output_pptx (Path): The path where the PowerPoint file will be saved.
         video_id (str): The YouTube video ID to create hyperlinks for the timestamps.
     """
     prs = Presentation()
     blank_slide_layout = prs.slide_layouts[6]
-    for img_path, seconds in tqdm(image_tuples, desc="Creating slides"):
+    for img_path in tqdm(image_paths, desc="Creating slides"):
         slide = prs.slides.add_slide(blank_slide_layout)
         slide.shapes.add_picture(
             str(img_path), Inches(0), Inches(0), width=prs.slide_width
         )
-        timestamp = make_timestamp(seconds)
+        timestamp = img_path.stem.split("_")[-1].replace("-", ":")
+        zero_hours = "0:"
+        if timestamp.startswith(zero_hours):
+            timestamp = timestamp[len(zero_hours) :]
+
+        seconds = timestamp_to_seconds(timestamp)
         youtube_link = f"https://www.youtube.com/watch?v={video_id}&t={seconds}s"
         left = Inches(0.3)
         top = (
