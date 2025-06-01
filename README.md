@@ -2,10 +2,12 @@
 
 A Python script to convert a YouTube video (or any video supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp)) into a PowerPoint presentation. The script downloads the video, extracts frames at regular intervals, removes near-duplicate frames, and creates a .pptx file with each unique frame as a slide. Each slide includes a timestamp and a clickable link to jump to that moment on YouTube.
 
+The PowerPoint presentation can be edited later, such as removing duplicated frames or adding notes.
+
 ## Features
 
 - Accepts any input supported by yt-dlp (YouTube URL, video ID, playlist, etc.)
-- Extracts frames every N seconds (default: 3 seconds)
+- Extracts frames every N seconds (default: 1 seconds)
 - Removes near-duplicate frames using perceptual hashing
 - Generates a PowerPoint presentation with each unique frame as a slide
 - Adds a timestamp and clickable YouTube link to each slide
@@ -43,13 +45,13 @@ This will create in the `out/` directory:
 You can also specify a custom base name and/or change the interval:
 
 ```sh
-python -m yt2pptx.cli dQw4w9WgXcQ MySlides --interval=10
+python -m yt2pptx.cli dQw4w9WgXcQ MySlides --interval=5
 ```
 
 ## How it Works
 
 1. **Download Video:** Uses yt-dlp to download the video.
-2. **Extract Frames:** Uses ffmpeg to extract frames every 3 seconds.
+2. **Extract Frames:** Uses ffmpeg to extract frames every 1 seconds.
 3. **Filter Duplicates:** Uses imagehash to remove near-duplicate frames.
 4. **Create PowerPoint:** Each unique frame becomes a slide, with a timestamp and a clickable link to the corresponding time on YouTube.
 

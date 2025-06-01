@@ -8,7 +8,6 @@ from .video_utils import (
     extract_video_id,
     extract_frames_ffmpeg,
     filter_unique_images,
-    sort_timestamp,
 )
 from .pptx_utils import create_pptx_from_images_with_timestamps
 
@@ -69,7 +68,28 @@ def download_youtube_video(
     return final_path, title, video_id
 
 
-def parse_args(argv: list[str]) -> tuple[str, str | None, int]:
+def youtube_to_pptx_cache_frames(
+    out_dir: Path,
+    video_file: Path,
+    pptx_output: Path,
+    *,  # Use * to enforce keyword-only arguments after this point
+    fps_interval: int,
+) -> None:
+    video_id = video_file.stem
+    frames_folder = out_dir / video_id
+
+    print(f"🎞 Extracting frames using interval: {fps_interval} seconds")
+    extracted_images = extract_frames_ffmpeg(
+        video_file, frames_folder, interval_seconds=fps_interval
+    )
+    print("🧹 Filtering duplicate frames...")
+    unique_images, _ = filter_unique_images(extracted_images, fps_interval=fps_interval)
+
+    print("🧾 Creating PowerPoint...")
+    create_pptx_from_images_with_timestamps(unique_images, pptx_output, video_id)
+
+
+def parse_args(argv: list[str]) -> tuple[str, str | None, int | None]:
     """Parse command line arguments.
 
     Args:
@@ -86,7 +106,7 @@ def parse_args(argv: list[str]) -> tuple[str, str | None, int]:
     """
     input_url_or_id = None
     custom_base = None
-    fps_interval = 3
+    fps_interval = None
     for arg in argv[1:]:
         if arg.startswith("-i=") or arg.startswith("--interval="):
             try:
@@ -110,33 +130,20 @@ def main() -> None:
             "❌ Usage: python -m yt2pptx.cli <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--interval=SECONDS]"
         )
         sys.exit(1)
+
+    if fps_interval is None:
+        fps_interval = 1  # Default to 1 second interval
+
     out_dir = Path() / "out"
     out_dir.mkdir(exist_ok=True)
-    video_file, video_title, video_id = download_youtube_video(input_url_or_id, out_dir)
+    video_file, video_title, _ = download_youtube_video(input_url_or_id, out_dir)
+
     base_name = custom_base or video_title
-    frames_folder = out_dir / video_id
-    has_interval = False
-    for p in frames_folder.glob("*_0-00-*.jpg"):
-        if p.name.endswith(f"{fps_interval:02d}.jpg"):
-            has_interval = True
-            break
     pptx_output = out_dir / f"{base_name}.pptx"
-    if not has_interval:
-        print("🎞 Extracting frames...")
-        extracted_images = extract_frames_ffmpeg(
-            video_file, frames_folder, interval_seconds=fps_interval
-        )
-    else:
-        print(
-            f"🎞 Using previously extracted frames in '{frames_folder}' (interval={fps_interval}s)"
-        )
-        extracted_images = sorted(
-            Path(frames_folder).glob("frame_*.jpg"), key=sort_timestamp
-        )
-    print("🧹 Filtering duplicate frames...")
-    unique_images = filter_unique_images(extracted_images, fps_interval=fps_interval)
-    print("🧾 Creating PowerPoint...")
-    create_pptx_from_images_with_timestamps(unique_images, pptx_output, video_id)
+
+    youtube_to_pptx_cache_frames(
+        out_dir, video_file, pptx_output, fps_interval=fps_interval
+    )
 
 
 if __name__ == "__main__":
