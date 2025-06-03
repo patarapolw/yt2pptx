@@ -50,7 +50,9 @@ python -m yt2pptx.cli dQw4w9WgXcQ MySlides --interval=5
 
 ### Post-processing
 
-PowerPoint can be edited to delete more duplicated frames. If some frames are missing, links to YouTube at the timestamp, and buttons to `ffplay` (bundled with `ffmpeg`) can be clicked to manually find the missing frames, or more accurate ones.
+PowerPoint can be edited to delete more duplicated frames. If some frames are missing, links to YouTube at the timestamp, and buttons to [ffplay](https://ffmpeg.org/ffplay.html) (bundled with `ffmpeg`) can be clicked to manually find the missing frames, or more accurate ones.
+
+[ShareX](https://getsharex.com) or similar can auto-snap to window contents, such as `ffplay` inner window, and YouTube [Picture-in-Picture](https://allthings.how/how-to-watch-youtube-in-pip-on-a-windows-pc/) mode.
 
 ## License
 
