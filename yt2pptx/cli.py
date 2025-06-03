@@ -1,5 +1,8 @@
 import sys
 from pathlib import Path
+import platform
+from os import startfile
+import subprocess
 
 import yt_dlp
 
@@ -86,7 +89,9 @@ def youtube_to_pptx_cache_frames(
     unique_images, _ = filter_unique_images(extracted_images, fps_interval=fps_interval)
 
     print("🧾 Creating PowerPoint...")
-    create_pptx_from_images_with_timestamps(unique_images, pptx_output, video_id)
+    create_pptx_from_images_with_timestamps(
+        unique_images, pptx_output, video_id, video_path=video_file
+    )
 
 
 def parse_args(argv: list[str]) -> tuple[str, str | None, int | None]:
@@ -132,7 +137,7 @@ def main() -> None:
         sys.exit(1)
 
     if fps_interval is None:
-        fps_interval = 1  # Default to 1 second interval
+        fps_interval = 2  # Default second interval
 
     out_dir = Path() / "out"
     out_dir.mkdir(exist_ok=True)
@@ -144,6 +149,16 @@ def main() -> None:
     youtube_to_pptx_cache_frames(
         out_dir, video_file, pptx_output, fps_interval=fps_interval
     )
+
+    def open_pptx(filepath):
+        if platform.system() == "Windows":
+            startfile(filepath)
+        elif platform.system() == "Darwin":  # macOS
+            subprocess.run(["open", filepath])
+        else:  # Linux and others
+            subprocess.run(["xdg-open", filepath])
+
+    open_pptx(pptx_output)
 
 
 if __name__ == "__main__":

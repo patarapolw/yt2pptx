@@ -7,7 +7,7 @@ The PowerPoint presentation can be edited later, such as removing duplicated fra
 ## Features
 
 - Accepts any input supported by yt-dlp (YouTube URL, video ID, playlist, etc.)
-- Extracts frames every N seconds (default: 1 seconds)
+- Extracts frames every N seconds
 - Removes near-duplicate frames using perceptual hashing
 - Generates a PowerPoint presentation with each unique frame as a slide
 - Adds a timestamp and clickable YouTube link to each slide
@@ -30,7 +30,7 @@ python -m yt2pptx.cli <YouTube_URL_or_ID> [output_base_name] [-i=SECONDS|--inter
 
 - `<YouTube_URL_or_ID>`: Any input accepted by yt-dlp (YouTube URL, video ID, playlist, etc.)
 - `[output_base_name]`: (Optional) Custom base name for output files
-- `-i=SECONDS` or `--interval=SECONDS`: (Optional, can be anywhere in the arguments) Set seconds between frames (default: 1)
+- `-i=SECONDS` or `--interval=SECONDS`: (Optional, can be anywhere in the arguments) Set seconds between frames (default: 2)
 
 ### Example
 
@@ -40,7 +40,7 @@ python -m yt2pptx.cli https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 This will create in the `out/` directory:
 - `out/video_title.pptx` — the generated PowerPoint
-- `out/{video_id}/` — folder with extracted frames and video title (where `{video_id}` is the YouTube video ID)
+- `out/{video_id}/` — folder with extracted frames, generated scripts, and video title (where `{video_id}` is the YouTube video ID)
 
 You can also specify a custom base name and/or change the interval:
 
@@ -48,12 +48,9 @@ You can also specify a custom base name and/or change the interval:
 python -m yt2pptx.cli dQw4w9WgXcQ MySlides --interval=5
 ```
 
-## How it Works
+### Post-processing
 
-1. **Download Video:** Uses yt-dlp to download the video.
-2. **Extract Frames:** Uses ffmpeg to extract frames every 1 seconds.
-3. **Filter Duplicates:** Uses imagehash to remove near-duplicate frames.
-4. **Create PowerPoint:** Each unique frame becomes a slide, with a timestamp and a clickable link to the corresponding time on YouTube.
+PowerPoint can be edited to delete more duplicated frames. If some frames are missing, links to YouTube at the timestamp, and buttons to `ffplay` (bundled with `ffmpeg`) can be clicked to manually find the missing frames, or more accurate ones.
 
 ## License
 
