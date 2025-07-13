@@ -253,7 +253,7 @@ def filter_unique_images(
     if duplicate_interval_list:
         print("🗑️ Removed duplicate frames:")
         chuck_size = 10
-        n_chunks = len(duplicate_interval_list) % chuck_size
+        n_chunks = (len(duplicate_interval_list) // chuck_size) + 1
         for i in range(n_chunks):
             print(
                 "  "
