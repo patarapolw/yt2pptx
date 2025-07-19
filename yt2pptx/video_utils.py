@@ -201,7 +201,9 @@ def filter_unique_images(
             hash_obj = imagehash.average_hash(img)
             hashes.append((path, hash_obj, idx))
     if hash_diff_threshold is None and len(hashes) > 1:
-        diffs = [abs(hashes[i][1] - hashes[i - 1][1]) for i in range(1, len(hashes))]
+        diffs = [
+            int(abs(hashes[i][1] - hashes[i - 1][1])) for i in range(1, len(hashes))
+        ]
         mean = statistics.mean(diffs)
         stdev = statistics.stdev(diffs) if len(diffs) > 1 else 0
         hash_diff_threshold = max(1, int(mean / 2))
