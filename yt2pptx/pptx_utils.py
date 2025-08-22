@@ -48,7 +48,7 @@ def create_pptx_from_images_with_timestamps(
             bat_path = img_path.with_suffix(".bat")
             bat_path.write_text(
                 f"@echo off\n"
-                f'ffplay -ss {seconds} -i "{video_path.absolute()}" -x 1920 -loglevel quiet\n'
+                f'ffplay -ss {seconds} -i "{video_path.absolute()}" -loglevel quiet\n'
             )
             youtube_cmd = str(bat_path.absolute())
 
