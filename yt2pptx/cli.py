@@ -50,7 +50,12 @@ def download_youtube_video(
 
     ydl_opts = {
         "outtmpl": str(final_path),
-        "format": "best[width<=?1920][height<=?1080]/bestvideo[width<=?1920][height<=?1080]+bestaudio",
+        "format": "/".join(
+            [
+                "best[width<=?1920][height<=?1080]",
+                "bestvideo[width<=?1920][height<=?1080]+bestaudio",
+            ]  # ][::-1]
+        ),
         "merge_output_format": "mp4",
         "progress_hooks": [get_info_hook],
         "quiet": True,
