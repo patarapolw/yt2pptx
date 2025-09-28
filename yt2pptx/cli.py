@@ -62,7 +62,7 @@ def download_youtube_video(
     }
     print("🔽 Downloading video...")
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # pyright: ignore[reportArgumentType]
         info = ydl.extract_info(input_url_or_id, download=True)
         if info is not None:
             video_info["title"] = info.get("title", "video")
@@ -70,7 +70,7 @@ def download_youtube_video(
         else:
             video_info["title"] = "video"
             video_info["id"] = ""
-    title = sanitize_filename(video_info["title"])
+    title = sanitize_filename(str(video_info["title"]))
     title_file.write_text(title, encoding="utf-8")
 
     return final_path, title, video_id
