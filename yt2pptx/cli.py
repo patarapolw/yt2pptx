@@ -59,6 +59,7 @@ def download_youtube_video(
         "merge_output_format": "mp4",
         "progress_hooks": [get_info_hook],
         "quiet": True,
+        # "sub_langs": "zh-Hans",
     }
     print("🔽 Downloading video...")
 
